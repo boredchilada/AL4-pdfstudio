@@ -1,0 +1,109 @@
+name: PdfStudio
+version: 4.7.0.1
+description: >-
+  Static structural analysis of PDF files using pdfstudio
+  (https://github.com/boredchilada/pdfstudio). Walks the PDF catalog graph,
+  applies 30+ structural detection rules, tracks per-revision weaponization,
+  detects embedded payloads (PE/ELF/ZIP) and auto-executing actions, and
+  extracts cleartext indicators of compromise. Read-only and offline by design.
+
+# File routing
+accepts: document/pdf
+rejects: empty|metadata/.*
+
+stage: CORE
+category: Static Analysis
+
+file_required: true
+timeout: 120
+disable_cache: false
+
+enabled: true
+is_external: false
+privileged: true
+
+# Static service configuration (-> self.config)
+config:
+  # Internal subprocess timeout; keep below the service `timeout` above.
+  internal_timeout: 110
+  # Maximum number of IOCs tagged per type.
+  max_iocs: 200
+  # Maximum number of embedded payloads carved + resubmitted per file.
+  max_extracted_payloads: 30
+
+# Per-submission tunables (-> request.get_param)
+submission_params:
+  - name: show_object_table
+    type: bool
+    default: false
+    value: false
+
+heuristics:
+  - heur_id: 1
+    name: High Severity PDF Indicator
+    score: 1000
+    filetype: document/pdf
+    attack_id:
+      - T1204
+    description: >-
+      pdfstudio flagged a HIGH severity indicator, such as an embedded
+      executable, a launch/command action, or auto-executing JavaScript.
+    signature_score_map:
+      embedded_pe: 1000
+      embedded_elf: 1000
+      embedded_zip: 500
+      launch_cmd: 1000
+      launch_newline_pad: 1000
+      openaction_js: 750
+
+  - heur_id: 2
+    name: Medium Severity PDF Indicator
+    score: 500
+    filetype: document/pdf
+    description: pdfstudio flagged a MED severity structural indicator.
+
+  - heur_id: 3
+    name: Low Severity PDF Indicator
+    score: 100
+    filetype: document/pdf
+    description: pdfstudio flagged a LOW severity indicator.
+
+  - heur_id: 4
+    name: Informational PDF Observation
+    score: 0
+    filetype: document/pdf
+    description: pdfstudio reported an informational metadata observation.
+
+  - heur_id: 5
+    name: Catalog Trigger Path
+    score: 500
+    filetype: document/pdf
+    attack_id:
+      - T1204
+    description: >-
+      pdfstudio's catalog-graph walk found an automatic trigger path
+      (e.g. /OpenAction or /AA) reaching active content.
+
+  - heur_id: 6
+    name: Multi-Revision Weaponization
+    score: 750
+    filetype: document/pdf
+    attack_id:
+      - T1027
+    description: >-
+      An incremental update introduced or rewrote objects in a manner
+      consistent with weaponization across revisions.
+
+  - heur_id: 7
+    name: PDF Parse Anomaly
+    score: 100
+    filetype: document/pdf
+    description: >-
+      pdfstudio reported parse warnings indicating a malformed or evasive
+      PDF structure.
+
+docker_config:
+  image: ghcr.io/boredchilada/al4-pdfstudio:4.7.0.1
+  cpu_cores: 1.0
+  ram_mb: 2048
+  allow_internet_access: false

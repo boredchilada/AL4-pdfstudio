@@ -1,0 +1,9 @@
+# Service code is built/run via the Dockerfile (copied into /opt/al_service), not
+# pip-installed. This file only configures local dev tooling.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

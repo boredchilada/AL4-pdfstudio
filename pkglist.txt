@@ -1,3 +1,1 @@
-# System (apt) packages required by the service.
-# git is needed so pip can install pdfstudio directly from its GitHub repo.
-git
+# apt packages, one per line. Leave empty if none.

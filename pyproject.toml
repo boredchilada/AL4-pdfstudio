@@ -1,9 +1,19 @@
-# Service code is built/run via the Dockerfile (copied into /opt/al_service), not
-# pip-installed. This file only configures local dev tooling.
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
+[project]
+name = "al4-pdfstudio"
+requires-python = ">=3.11"
 
 [tool.ruff]
-line-length = 100
-target-version = "py310"
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+include = ["pdfstudio_", "tests", "scripts"]
+
+[tool.pytest.ini_options]
+# Only the tests folder: local scratch in an ignored directory must not be collected.
+testpaths = ["tests"]

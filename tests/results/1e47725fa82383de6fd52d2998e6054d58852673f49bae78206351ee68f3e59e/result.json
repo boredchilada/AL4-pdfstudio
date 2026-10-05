@@ -1,0 +1,212 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 1000,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": {
+          "flags": 3,
+          "header": "%PDF-1.4",
+          "objects": 5,
+          "parse_warnings": 0,
+          "revisions": 1,
+          "size_bytes": 517,
+          "triggers": 1
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "pdfstudio summary",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "URI_TO_EXECUTABLE",
+            "message": "obj 5 URI directly links to a .exe download: http://evil.example/payload.exe"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1204"
+          ],
+          "frequency": 1,
+          "heur_id": 1,
+          "score": 1000,
+          "score_map": {},
+          "signatures": {
+            "uri_to_executable": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "High severity indicators",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "EXTERNAL_HOSTS",
+            "message": "PDF URIs contact 1 non-boilerplate host(s): evil.example"
+          },
+          {
+            "code": "UNCOMMON_TLD",
+            "message": "obj 5 URI host \"evil.example\" uses uncommon TLD \".example\"."
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 4,
+          "score": 0,
+          "score_map": {},
+          "signatures": {
+            "external_hosts": 1,
+            "uncommon_tld": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Informational observations",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "detail": "<</Type/Action/S/URI/URI(http://evil.example/payload.exe)>>",
+            "path": "Page \u2192 obj 4 [Annot:Link] \u2192 /A \u2192 obj 5 [Action:URI]",
+            "severity": "MED",
+            "trigger": "/Annot /A"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "trigger",
+            "path",
+            "detail",
+            "severity"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Catalog trigger paths",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "type": "uri",
+            "value": "http://evil.example/payload.exe"
+          },
+          {
+            "type": "domain",
+            "value": "evil.example"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "type",
+            "value"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {
+          "network": {
+            "static": {
+              "domain": [
+                "evil.example"
+              ],
+              "uri": [
+                "http://evil.example/payload.exe"
+              ]
+            }
+          }
+        },
+        "title_text": "Cleartext indicators of compromise",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "pdfstudio_report.json",
+        "sha256": "a2fa5e42be938342ccd3a6bd22de5da0641c65ed3f3020f239842a8f92b9c4f3"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [
+          "T1204"
+        ],
+        "heur_id": 1,
+        "signatures": [
+          "uri_to_executable"
+        ]
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 4,
+        "signatures": [
+          "external_hosts",
+          "uncommon_tld"
+        ]
+      }
+    ],
+    "tags": {
+      "network.static.domain": [
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "evil.example"
+        }
+      ],
+      "network.static.uri": [
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "http://evil.example/payload.exe"
+        }
+      ]
+    },
+    "temp_submission_data": {}
+  }
+}

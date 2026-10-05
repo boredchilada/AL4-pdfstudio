@@ -1,0 +1,119 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 1000,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": {
+          "flags": 1,
+          "header": "%PDF-1.4",
+          "objects": 4,
+          "parse_warnings": 0,
+          "revisions": 1,
+          "size_bytes": 420,
+          "triggers": 0
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "pdfstudio summary",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "EMBEDDED_PE",
+            "message": "obj 4 decoded stream starts with MZ (Windows PE)."
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1204"
+          ],
+          "frequency": 1,
+          "heur_id": 1,
+          "score": 1000,
+          "score_map": {},
+          "signatures": {
+            "embedded_pe": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "High severity indicators",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "file": "obj_4.exe",
+            "sha256": "06ca0d0a7ad745d132f56d99d7646784850261efbedf1f176faa0b5ac0ad6018",
+            "size": 100,
+            "type": "Embedded PE/MZ executable"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "file",
+            "type",
+            "size",
+            "sha256"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Extracted embedded payloads",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [
+      {
+        "name": "obj_4.exe",
+        "sha256": "06ca0d0a7ad745d132f56d99d7646784850261efbedf1f176faa0b5ac0ad6018"
+      }
+    ],
+    "supplementary": [
+      {
+        "name": "pdfstudio_report.json",
+        "sha256": "841758f0e02c84d5793abe8d5a2b10b6a395506b44b7eab2dfa60dab2533489f"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [
+          "T1204"
+        ],
+        "heur_id": 1,
+        "signatures": [
+          "embedded_pe"
+        ]
+      }
+    ],
+    "tags": {},
+    "temp_submission_data": {}
+  }
+}

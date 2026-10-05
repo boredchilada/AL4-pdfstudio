@@ -1,13 +1,10 @@
-**/__pycache__/
-**/*.pyc
 .git/
 .github/
-.gitignore
+.forgejo/
 .venv/
 venv/
-.pytest_cache/
-.ruff_cache/
+__pycache__/
 tests/
+scripts/
+docs/
 *.md
-!README.md
-CLAUDE.md

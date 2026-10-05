@@ -1,0 +1,43 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 0,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": {
+          "flags": 0,
+          "header": "%PDF-1.4",
+          "objects": 3,
+          "parse_warnings": 0,
+          "revisions": 1,
+          "size_bytes": 316,
+          "triggers": 0
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "pdfstudio summary",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "pdfstudio_report.json",
+        "sha256": "da082efa4dc60a9a22b2af086e250ed1efaf8d6980442a3fa2ef09835b449c7d"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [],
+    "tags": {},
+    "temp_submission_data": {}
+  }
+}

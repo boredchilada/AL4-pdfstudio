@@ -1,5 +1,5 @@
 name: PdfStudio
-version: 4.7.0.1
+version: $SERVICE_TAG
 description: >-
   Static structural analysis of PDF files using pdfstudio
   (https://github.com/boredchilada/pdfstudio). Walks the PDF catalog graph,
@@ -81,8 +81,9 @@ heuristics:
     attack_id:
       - T1204
     description: >-
-      pdfstudio's catalog-graph walk found an automatic trigger path
-      (e.g. /OpenAction or /AA) reaching active content.
+      pdfstudio's catalog-graph walk found a trigger path (e.g. /OpenAction
+      or /AA) reaching a JavaScript or Launch action. Links, form widgets and
+      open-at-page actions are listed but not scored.
 
   - heur_id: 6
     name: Multi-Revision Weaponization
@@ -103,7 +104,7 @@ heuristics:
       PDF structure.
 
 docker_config:
-  image: ghcr.io/boredchilada/al4-pdfstudio:4.7.0.1
+  image: ghcr.io/boredchilada/al4-pdfstudio:$SERVICE_TAG
   cpu_cores: 1.0
   ram_mb: 2048
   allow_internet_access: false

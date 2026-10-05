@@ -1,0 +1,281 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 2750,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": {
+          "flags": 4,
+          "header": "%PDF-1.4",
+          "objects": 5,
+          "parse_warnings": 0,
+          "revisions": 2,
+          "size_bytes": 575,
+          "triggers": 1
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "pdfstudio summary",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "LAUNCH_CMD",
+            "message": "obj 4 is a /Launch action invoking cmd.exe"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1204"
+          ],
+          "frequency": 1,
+          "heur_id": 1,
+          "score": 1000,
+          "score_map": {},
+          "signatures": {
+            "launch_cmd": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "High severity indicators",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "MULTI_REV",
+            "message": "Incremental-update chain (2 revisions). Each revision can add / rewrite objects after the canonical %%EOF."
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 2,
+          "score": 500,
+          "score_map": {},
+          "signatures": {
+            "multi_rev": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Medium severity indicators",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "HAS_OPENACTION",
+            "message": "/OpenAction present \u2014 a target runs automatically when the document opens. Inspect the linked object."
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 4,
+          "score": 0,
+          "score_map": {},
+          "signatures": {
+            "has_openaction": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Informational observations",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "MULTI_REV_WEAPONIZATION",
+            "message": "Revision v1: adds /Launch (obj 4)"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1027"
+          ],
+          "frequency": 1,
+          "heur_id": 6,
+          "score": 750,
+          "score_map": {},
+          "signatures": {
+            "multi_rev_weaponization": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Multi-revision weaponization",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "detail": "<</S/Launch/Type/Action/Win<</F(cmd.exe)>>>>",
+            "path": "Catalog (obj 1) \u2192 /OpenAction \u2192 obj 4 [Action:Launch]",
+            "severity": "HIGH",
+            "trigger": "/OpenAction"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "trigger",
+            "path",
+            "detail",
+            "severity"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1204"
+          ],
+          "frequency": 1,
+          "heur_id": 5,
+          "score": 500,
+          "score_map": {},
+          "signatures": {}
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Catalog trigger paths",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "new_objects": 3,
+            "revision": 0,
+            "rewritten_objects": 0
+          },
+          {
+            "new_objects": 1,
+            "revision": 1,
+            "rewritten_objects": 1
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "revision",
+            "new_objects",
+            "rewritten_objects"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Incremental updates (2 revisions)",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "pdfstudio_report.json",
+        "sha256": "3affd85aa6ad1fe8553da9f481afd3f38c8af3e6e5ad9074323fcfdf89f42355"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [
+          "T1204"
+        ],
+        "heur_id": 1,
+        "signatures": [
+          "launch_cmd"
+        ]
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 2,
+        "signatures": [
+          "multi_rev"
+        ]
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 4,
+        "signatures": [
+          "has_openaction"
+        ]
+      },
+      {
+        "attack_ids": [
+          "T1204"
+        ],
+        "heur_id": 5,
+        "signatures": []
+      },
+      {
+        "attack_ids": [
+          "T1027"
+        ],
+        "heur_id": 6,
+        "signatures": [
+          "multi_rev_weaponization"
+        ]
+      }
+    ],
+    "tags": {},
+    "temp_submission_data": {}
+  }
+}

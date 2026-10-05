@@ -1,0 +1,116 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 0,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": {
+          "flags": 1,
+          "header": "%PDF-1.4",
+          "objects": 4,
+          "parse_warnings": 0,
+          "revisions": 1,
+          "size_bytes": 459,
+          "triggers": 2
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "pdfstudio summary",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "HAS_OPENACTION",
+            "message": "/OpenAction present \u2014 a target runs automatically when the document opens. Inspect the linked object."
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 4,
+          "score": 0,
+          "score_map": {},
+          "signatures": {
+            "has_openaction": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Informational observations",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "detail": "<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Annots[4 0 R]>>",
+            "path": "Catalog (obj 1) \u2192 /OpenAction \u2192 obj 3 [Page]",
+            "severity": "MED",
+            "trigger": "/OpenAction"
+          },
+          {
+            "detail": "<</Type/Annot/Subtype/Link/Rect[50 50 300 80]/Dest[3 0 R/XYZ 0 792 0]>>",
+            "path": "Page \u2192 obj 4 [Annot:Link]",
+            "severity": "LOW",
+            "trigger": "/Annot"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "trigger",
+            "path",
+            "detail",
+            "severity"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Catalog trigger paths",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "pdfstudio_report.json",
+        "sha256": "383a568d4eef72d8c33c9d240f6865ba113e35c5e7310fa9c90396d892bc0f44"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [],
+        "heur_id": 4,
+        "signatures": [
+          "has_openaction"
+        ]
+      }
+    ],
+    "tags": {},
+    "temp_submission_data": {}
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 0,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": {
+          "flags": 0,
+          "header": "%PDF-1.4",
+          "objects": 5,
+          "parse_warnings": 0,
+          "revisions": 1,
+          "size_bytes": 602,
+          "triggers": 0
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "pdfstudio summary",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "found_in": "stream of obj 4",
+            "type": "uri",
+            "value": "https://docs.example.org/manual"
+          },
+          {
+            "found_in": "host of a hidden URL",
+            "type": "domain",
+            "value": "docs.example.org"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "type",
+            "value",
+            "found_in"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {
+          "network": {
+            "static": {
+              "domain": [
+                "docs.example.org"
+              ],
+              "uri": [
+                "https://docs.example.org/manual"
+              ]
+            }
+          }
+        },
+        "title_text": "Hidden indicators (compressed or encoded)",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "pdfstudio_report.json",
+        "sha256": "c89be7c9a9c3ba05a65f44a6d5928442adf5211456c4d320d9414d60eabb70d5"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [],
+    "tags": {
+      "network.static.domain": [
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "docs.example.org"
+        }
+      ],
+      "network.static.uri": [
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "https://docs.example.org/manual"
+        }
+      ]
+    },
+    "temp_submission_data": {}
+  }
+}

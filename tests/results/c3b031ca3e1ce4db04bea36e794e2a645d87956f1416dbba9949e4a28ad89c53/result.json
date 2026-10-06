@@ -1,18 +1,18 @@
 {
   "extra": {
     "drop_file": false,
-    "score": 300,
+    "score": 0,
     "sections": [
       {
         "auto_collapse": false,
         "body": {
-          "flags": 3,
+          "flags": 2,
           "header": "%PDF-1.4",
           "objects": 5,
           "parse_warnings": 0,
           "revisions": 1,
-          "size_bytes": 517,
-          "triggers": 1
+          "size_bytes": 610,
+          "triggers": 2
         },
         "body_config": {},
         "body_format": "KEY_VALUE",
@@ -28,46 +28,12 @@
         "auto_collapse": false,
         "body": [
           {
-            "code": "URI_TO_EXECUTABLE",
-            "message": "obj 5 URI directly links to a .exe download: http://evil.example/payload.exe"
-          }
-        ],
-        "body_config": {
-          "column_order": [
-            "code",
-            "message"
-          ]
-        },
-        "body_format": "TABLE",
-        "classification": "TLP:C",
-        "depth": 0,
-        "heuristic": {
-          "attack_ids": [
-            "T1204"
-          ],
-          "frequency": 1,
-          "heur_id": 1,
-          "score": 300,
-          "score_map": {},
-          "signatures": {
-            "uri_to_executable": 1
-          }
-        },
-        "promote_to": null,
-        "tags": {},
-        "title_text": "High severity indicators",
-        "zeroize_on_tag_safe": false
-      },
-      {
-        "auto_collapse": false,
-        "body": [
-          {
             "code": "EXTERNAL_HOSTS",
-            "message": "PDF URIs contact 1 non-boilerplate host(s): evil.example"
+            "message": "PDF URIs contact 1 non-boilerplate host(s): octal.example"
           },
           {
             "code": "UNCOMMON_TLD",
-            "message": "obj 5 URI host \"evil.example\" uses uncommon TLD \".example\"."
+            "message": "obj 4 URI host \"octal.example\" uses uncommon TLD \".example\"."
           }
         ],
         "body_config": {
@@ -99,10 +65,16 @@
         "auto_collapse": false,
         "body": [
           {
-            "detail": "<</Type/Action/S/URI/URI(http://evil.example/payload.exe)>>",
-            "path": "Page \u2192 obj 4 [Annot:Link] \u2192 /A \u2192 obj 5 [Action:URI]",
-            "severity": "MED",
-            "trigger": "/Annot /A"
+            "detail": "<</Type/Annot/Subtype/Link/Rect[50 50 300 80]/A<</S/URI/URI(h\\164\\164p://octal.example/login)>>>>",
+            "path": "Page \u2192 obj 4 [Annot:Link]",
+            "severity": "LOW",
+            "trigger": "/Annot"
+          },
+          {
+            "detail": "<</Type/Annot/Subtype/Link/Rect[50 100 300 130]/A<</S/URI/URI<687474703a2f2f6865782e6578616d706c652f646f63>>>>>",
+            "path": "Page \u2192 obj 5 [Annot:Link]",
+            "severity": "LOW",
+            "trigger": "/Annot"
           }
         ],
         "body_config": {
@@ -126,18 +98,31 @@
         "auto_collapse": false,
         "body": [
           {
+            "found_in": "obj 5",
             "type": "uri",
-            "value": "http://evil.example/payload.exe"
+            "value": "http://hex.example/doc"
           },
           {
+            "found_in": "obj 4",
+            "type": "uri",
+            "value": "http://octal.example/login"
+          },
+          {
+            "found_in": "host of a hidden URL",
             "type": "domain",
-            "value": "evil.example"
+            "value": "hex.example"
+          },
+          {
+            "found_in": "host of a hidden URL",
+            "type": "domain",
+            "value": "octal.example"
           }
         ],
         "body_config": {
           "column_order": [
             "type",
-            "value"
+            "value",
+            "found_in"
           ]
         },
         "body_format": "TABLE",
@@ -149,15 +134,17 @@
           "network": {
             "static": {
               "domain": [
-                "evil.example"
+                "hex.example",
+                "octal.example"
               ],
               "uri": [
-                "http://evil.example/payload.exe"
+                "http://hex.example/doc",
+                "http://octal.example/login"
               ]
             }
           }
         },
-        "title_text": "Cleartext indicators of compromise",
+        "title_text": "Hidden indicators (compressed or encoded)",
         "zeroize_on_tag_safe": false
       }
     ]
@@ -167,21 +154,12 @@
     "supplementary": [
       {
         "name": "pdfstudio_report.json",
-        "sha256": "a2fa5e42be938342ccd3a6bd22de5da0641c65ed3f3020f239842a8f92b9c4f3"
+        "sha256": "0205277f324165d44681cd0ccaf369c3403e17c9aa694e0672b2573ccc9d6bbe"
       }
     ]
   },
   "results": {
     "heuristics": [
-      {
-        "attack_ids": [
-          "T1204"
-        ],
-        "heur_id": 1,
-        "signatures": [
-          "uri_to_executable"
-        ]
-      },
       {
         "attack_ids": [],
         "heur_id": 4,
@@ -196,14 +174,24 @@
         {
           "heur_id": null,
           "signatures": [],
-          "value": "evil.example"
+          "value": "hex.example"
+        },
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "octal.example"
         }
       ],
       "network.static.uri": [
         {
           "heur_id": null,
           "signatures": [],
-          "value": "http://evil.example/payload.exe"
+          "value": "http://hex.example/doc"
+        },
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "http://octal.example/login"
         }
       ]
     },

@@ -55,12 +55,22 @@ heuristics:
       launch_cmd: 1000
       launch_newline_pad: 1000
       openaction_js: 750
+      # Links need a click; a link to an executable or archive is suspicious, not malicious.
+      uri_to_executable: 300
 
   - heur_id: 2
     name: Medium Severity PDF Indicator
     score: 500
     filetype: document/pdf
     description: pdfstudio flagged a MED severity structural indicator.
+    signature_score_map:
+      # Link targets need a click and are common in technical documents.
+      url_shortener: 100
+      dynamic_dns: 100
+      abused_file_host: 100
+      raw_ip_uri: 100
+      canarytoken: 100
+      base64_in_uri: 100
 
   - heur_id: 3
     name: Low Severity PDF Indicator

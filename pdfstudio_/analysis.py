@@ -2,6 +2,7 @@
 
 import json
 import re
+from collections.abc import Iterable
 
 # pdfstudio severity tier -> manifest heuristic id.
 SEVERITY_HEURISTIC = {"HIGH": 1, "MED": 2, "LOW": 3, "INFO": 4}
@@ -58,10 +59,17 @@ def sniff_embedded(data: bytes) -> tuple[str, str] | None:
     return None
 
 
-def heuristic_for_flag(severity: str | None, code: str) -> int:
-    """Map a pdfstudio flag ``(severity, code)`` to a manifest heuristic id."""
+def heuristic_for_flag(severity: str | None, code: str, active_trigger: bool) -> int:
+    """Map a pdfstudio flag ``(severity, code)`` to a manifest heuristic id.
+
+    ``OPENACTION_JS`` only means /OpenAction and /JavaScript both occur somewhere in the file. It is
+    scored only when the trigger walk confirms an automatic path into JavaScript or Launch
+    (``active_trigger``); otherwise it is informational.
+    """
     if code in CODE_HEURISTIC:
         return CODE_HEURISTIC[code]
+    if code == "OPENACTION_JS" and not active_trigger:
+        return 4
     return SEVERITY_HEURISTIC.get((severity or "").upper(), 4)
 
 
@@ -75,28 +83,132 @@ def has_active_trigger(triggers: list[dict]) -> bool:
     return any((t.get("severity") or "").upper() == "HIGH" for t in triggers)
 
 
+def urls_in(data: bytes) -> list[str]:
+    """Every http/https/ftp URL in ``data``, in order of appearance, namespace domains removed."""
+    urls = []
+    for match in _URI_RE.findall(data):
+        uri = match.decode("latin-1").rstrip(").>")
+        dm = _DOMAIN_FROM_URI_RE.match(uri)
+        if dm and dm.group(1).lower() in IOC_DOMAIN_SAFELIST:
+            continue
+        urls.append(uri)
+    return urls
+
+
+def url_host(uri: str) -> str | None:
+    """Lower-cased host part of a URL, or None."""
+    dm = _DOMAIN_FROM_URI_RE.match(uri)
+    return dm.group(1).lower() if dm else None
+
+
+def is_ip(host: str) -> bool:
+    return _IP_RE.fullmatch(host.encode("latin-1", "replace")) is not None
+
+
 def extract_iocs(raw: bytes) -> dict[str, list[str]]:
     """Cleartext IOCs found in raw PDF bytes, with namespace domains removed.
 
-    Only cleartext is matched; URIs hidden inside compressed object streams are not
-    recovered here (that requires pdfstudio's network-enabled hunt mode).
+    Only cleartext is matched here; :func:`find_hidden_urls` covers compressed and encoded URLs.
     """
-    uris, ips, domains = set(), set(), set()
-
-    for match in _URI_RE.findall(raw):
-        uri = match.decode("latin-1").rstrip(").>")
-        dm = _DOMAIN_FROM_URI_RE.match(uri)
-        domain = dm.group(1).lower() if dm else None
-        if domain and domain in IOC_DOMAIN_SAFELIST:
-            continue
-        uris.add(uri)
-        if domain:
-            domains.add(domain)
-
-    for match in _IP_RE.findall(raw):
-        ips.add(match.decode("latin-1"))
-
+    uris = set(urls_in(raw))
+    domains = {host for host in map(url_host, uris) if host}
+    ips = {match.decode("latin-1") for match in _IP_RE.findall(raw)}
     return {"uri": sorted(uris), "domain": sorted(domains), "ip": sorted(ips)}
+
+
+# --- PDF strings and hidden URLs -------------------------------------------------------
+
+_URI_LITERAL = re.compile(r"/URI\s*\(")
+_URI_HEX = re.compile(r"/URI\s*<([0-9A-Fa-f\s]*)>")
+_ESCAPES = {"n": "\n", "r": "\r", "t": "\t", "b": "\b", "f": "\f", "(": "(", ")": ")", "\\": "\\"}
+
+
+def _text_string(value: str) -> str:
+    """PDF text strings may be UTF-16BE with a byte order mark; everything else is kept as bytes 0-255."""
+    if value.startswith("\xfe\xff"):
+        return value[2:].encode("latin-1", "replace").decode("utf-16-be", "replace")
+    return value
+
+
+def read_literal_string(text: str, start: int) -> str | None:
+    """Decode the PDF literal string that starts just after an opening ``(`` at ``text[start - 1]``.
+
+    Handles nested parentheses, backslash escapes, octal escapes (``\\164`` is ``t``) and
+    line continuations. Returns None when the string is not terminated.
+    """
+    out: list[str] = []
+    depth, i, end = 1, start, len(text)
+    while i < end:
+        char = text[i]
+        if char == "\\":
+            i += 1
+            if i >= end:
+                return None
+            nxt = text[i]
+            if nxt in _ESCAPES:
+                out.append(_ESCAPES[nxt])
+                i += 1
+            elif nxt in "01234567":
+                j = i
+                while j < end and j - i < 3 and text[j] in "01234567":
+                    j += 1
+                out.append(chr(int(text[i:j], 8) & 0xFF))
+                i = j
+            elif nxt == "\r":
+                i += 2 if text[i + 1:i + 2] == "\n" else 1
+            elif nxt == "\n":
+                i += 1
+            else:
+                out.append(nxt)
+                i += 1
+            continue
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return _text_string("".join(out))
+        out.append(char)
+        i += 1
+    return None
+
+
+def uri_action_targets(body: str) -> list[str]:
+    """Decoded values of every ``/URI`` entry in an object body: literal ``(...)`` and hex ``<...>`` forms."""
+    targets = []
+    for match in _URI_LITERAL.finditer(body):
+        value = read_literal_string(body, match.end())
+        if value is not None:
+            targets.append(value)
+    for match in _URI_HEX.finditer(body):
+        digits = re.sub(r"\s", "", match.group(1))
+        digits += "0" * (len(digits) % 2)  # an odd final digit is padded with 0 (PDF spec)
+        targets.append(_text_string(bytes.fromhex(digits).decode("latin-1")))
+    return [t.strip() for t in targets if t.strip()]
+
+
+def find_hidden_urls(bodies: Iterable[tuple[str, str]], streams: Iterable[tuple[str, bytes]],
+                     visible: set[str]) -> list[tuple[str, str]]:
+    """URLs that do not appear as plain text in the file, as ``(url, where)`` sorted by URL.
+
+    ``bodies`` are object dictionaries, including objects unpacked from object streams; their
+    ``/URI`` values are decoded from literal escapes or hex before matching. ``streams`` are
+    decoded stream contents. ``visible`` holds the URLs already found in the raw bytes.
+    """
+    found: dict[str, str] = {}
+
+    def add(urls: list[str], where: str) -> None:
+        for url in urls:
+            if url not in visible:
+                found.setdefault(url, where)
+
+    for where, body in bodies:
+        targets = uri_action_targets(body)
+        add([u for t in targets for u in urls_in(t.encode("latin-1", "replace"))], where)
+        add(urls_in(body.encode("latin-1", "replace")), where)
+    for where, data in streams:
+        add(urls_in(data), where)
+    return sorted(found.items())
 
 
 def parse_report(stdout: str) -> dict:

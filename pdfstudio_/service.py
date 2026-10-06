@@ -24,14 +24,21 @@ from assemblyline_v4_service.common.result import (
     TableRow,
 )
 from assemblyline_v4_service.common.task import MaxExtractedExceeded
+from pdfstudio.classify import classify
+from pdfstudio.model import PDFFile
+from pdfstudio.objstm import expand_objstm_all
+from pdfstudio.parser import parse
 
 from pdfstudio_.analysis import (
     HEUR_SECTION_TITLE,
     extract_iocs,
+    find_hidden_urls,
     has_active_trigger,
     heuristic_for_flag,
+    is_ip,
     parse_report,
     sniff_embedded,
+    url_host,
 )
 
 # pdfstudio exposes its CLI as ``pdfstudio.cli:main``. Calling main() through ``python -c`` is
@@ -63,8 +70,10 @@ class PdfStudio(ServiceBase):
         request.result = result
 
         try:
+            # --objstm unpacks objects stored inside object streams, so the rules also see actions
+            # and links that modern (and malicious) PDFs pack there.
             proc = subprocess.run(
-                [sys.executable, "-c", _PDFSTUDIO_BOOTSTRAP, request.file_path, "--json"],
+                [sys.executable, "-c", _PDFSTUDIO_BOOTSTRAP, request.file_path, "--json", "--objstm"],
                 capture_output=True, timeout=self.internal_timeout, check=False,
             )
         except subprocess.TimeoutExpired:
@@ -90,12 +99,15 @@ class PdfStudio(ServiceBase):
         request.add_supplementary(report_path, "pdfstudio_report.json", "Full pdfstudio JSON report")
 
         self._add_summary(result, report)
-        self._add_flags(result, report.get("flags") or [])
+        self._add_flags(result, report.get("flags") or [], has_active_trigger(report.get("triggers") or []))
         self._add_triggers(result, report.get("triggers") or [])
         self._add_revisions(result, report.get("revisions") or [])
         self._add_parse_warnings(result, report.get("parse_warnings") or [])
-        self._add_iocs(result, request)
-        self._extract_embedded(result, request)
+        visible = self._add_iocs(result, request)
+        pdf = self._parse_in_process(request.file_path)
+        if pdf is not None:
+            self._add_hidden_urls(result, pdf, visible)
+            self._extract_embedded(result, request, pdf)
         if request.get_param("show_object_table") or request.deep_scan:
             self._add_objects(result, report.get("objects") or [])
 
@@ -109,18 +121,23 @@ class PdfStudio(ServiceBase):
         result.add_section(summary)
 
     @staticmethod
-    def _add_flags(result: Result, flags: list[dict]) -> None:
+    def _add_flags(result: Result, flags: list[dict], active_trigger: bool) -> None:
         by_heuristic: dict[int, list[dict]] = {}
         for flag in flags:
-            by_heuristic.setdefault(heuristic_for_flag(flag.get("severity"), flag.get("code", "")), []).append(flag)
+            heur_id = heuristic_for_flag(flag.get("severity"), flag.get("code", ""), active_trigger)
+            by_heuristic.setdefault(heur_id, []).append(flag)
         for heur_id in sorted(by_heuristic):
             section = ResultTableSection(HEUR_SECTION_TITLE.get(heur_id, "PDF indicators"))
             heuristic = Heuristic(heur_id)
+            scored: set[str] = set()
             for flag in by_heuristic[heur_id]:
                 code = flag.get("code", "?")
                 section.add_row(TableRow({"code": code, "message": flag.get("message", "")}))
+                # Each rule scores once per file: a document with many links must not multiply its score.
                 # Signature ids must be lowercase for the AL ODM; the manifest's score map matches.
-                heuristic.add_signature_id(code.lower())
+                if code.lower() not in scored:
+                    scored.add(code.lower())
+                    heuristic.add_signature_id(code.lower())
             section.set_heuristic(heuristic)
             result.add_section(section)
 
@@ -159,7 +176,8 @@ class PdfStudio(ServiceBase):
         section.set_heuristic(7)
         result.add_section(section)
 
-    def _add_iocs(self, result: Result, request: ServiceRequest) -> None:
+    def _add_iocs(self, result: Result, request: ServiceRequest) -> set[str]:
+        """Tag cleartext IOCs; returns the cleartext URLs so hidden ones can be told apart."""
         with open(request.file_path, "rb") as handle:
             iocs = extract_iocs(handle.read())
         section = ResultTableSection("Cleartext indicators of compromise")
@@ -169,31 +187,64 @@ class PdfStudio(ServiceBase):
                 section.add_tag(tag_type, value)
         if section.body:
             result.add_section(section)
+        return set(iocs["uri"])
 
-    def _extract_embedded(self, result: Result, request: ServiceRequest) -> None:
-        """Carve embedded payloads from decoded streams and resubmit them for analysis.
+    def _parse_in_process(self, path: str) -> PDFFile | None:
+        """Parse with pdfstudio's own pipeline: decode streams, classify, unpack object streams.
 
-        Uses pdfstudio's parser in-process to get decoded stream bytes. Fail-soft: an error here
-        must not break the core report.
+        Fail-soft: hidden URLs and carving are skipped if this fails; the core report stands.
         """
         try:
-            from pdfstudio.parser import parse
-            pdf = parse(request.file_path, decode_streams=True)
+            pdf = parse(path, decode_streams=True)
+            classify(pdf)
+            if expand_objstm_all(pdf):
+                classify(pdf)  # give the unpacked objects a kind, as the pdfstudio CLI does
+            return pdf
         except Exception as exc:
-            self.log.warning(f"pdfstudio in-process parse failed; skipping carving: {exc}")
-            return
+            self.log.warning(f"pdfstudio in-process parse failed; skipping hidden URLs and carving: {exc}")
+            return None
 
+    def _add_hidden_urls(self, result: Result, pdf: PDFFile, visible: set[str]) -> None:
+        """Tag URLs that only appear inside compressed streams, object streams or encoded strings."""
+        bodies: list[tuple[str, str]] = []
+        streams: list[tuple[str, bytes]] = []
+        for obj in pdf.objects:
+            container = next((label.rsplit(" ", 1)[-1] for label in obj.labels
+                              if label.startswith("ObjStm-child in obj ")), None)
+            bodies.append((f"obj {obj.index} (inside object stream {container})" if container else f"obj {obj.index}",
+                           obj.body))
+            if obj.stream is not None and obj.stream.decoded_bytes:
+                streams.append((f"stream of obj {obj.index}", obj.stream.decoded_bytes))
+        hidden = find_hidden_urls(bodies, streams, visible)[: self.max_iocs]
+        if not hidden:
+            return
+        section = ResultTableSection("Hidden indicators (compressed or encoded)")
+        hosts: set[str] = set()
+        for url, where in hidden:
+            section.add_row(TableRow({"type": "uri", "value": url, "found_in": where}))
+            section.add_tag(IOC_TAGS["uri"], url)
+            host = url_host(url)
+            if host:
+                hosts.add(host)
+        for host in sorted(hosts):
+            kind = "ip" if is_ip(host) else "domain"
+            section.add_row(TableRow({"type": kind, "value": host, "found_in": "host of a hidden URL"}))
+            section.add_tag(IOC_TAGS[kind], host)
+        result.add_section(section)
+
+    def _extract_embedded(self, result: Result, request: ServiceRequest, pdf: PDFFile) -> None:
+        """Carve embedded payloads from decoded streams and resubmit them for analysis."""
         section = ResultTableSection("Extracted embedded payloads")
         seen: set[str] = set()
-        for obj in getattr(pdf, "objects", None) or []:
+        for obj in pdf.objects:
             if len(seen) >= self.max_extracted_payloads:
                 self.log.info(f"Reached extraction cap ({self.max_extracted_payloads})")
                 break
-            stream = getattr(obj, "stream", None)
+            stream = obj.stream
             if stream is None:
                 continue
-            decoded = getattr(stream, "decoded_bytes", None) or getattr(stream, "raw_bytes", None)
-            if not isinstance(decoded, (bytes, bytearray)) or not decoded:
+            decoded = stream.decoded_bytes or stream.raw_bytes
+            if not decoded:
                 continue
             data = bytes(decoded)
             sniffed = sniff_embedded(data)
@@ -205,7 +256,7 @@ class PdfStudio(ServiceBase):
             seen.add(sha256)
 
             ext, description = sniffed
-            name = f"obj_{getattr(obj, 'index', 'x')}.{ext}"
+            name = f"obj_{obj.index}.{ext}"
             path = os.path.join(self.working_directory, f"{sha256[:16]}_{name}")
             with open(path, "wb") as handle:
                 handle.write(data)

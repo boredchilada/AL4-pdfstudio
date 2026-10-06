@@ -6,10 +6,14 @@ import pytest
 
 from pdfstudio_.analysis import (
     extract_iocs,
+    find_hidden_urls,
     has_active_trigger,
     heuristic_for_flag,
+    is_ip,
     parse_report,
+    read_literal_string,
     sniff_embedded,
+    uri_action_targets,
 )
 
 
@@ -26,7 +30,12 @@ from pdfstudio_.analysis import (
     ],
 )
 def test_heuristic_for_flag(severity, code, expected):
-    assert heuristic_for_flag(severity, code) == expected
+    assert heuristic_for_flag(severity, code, active_trigger=True) == expected
+
+
+@pytest.mark.parametrize("active_trigger,expected", [(True, 1), (False, 4)])
+def test_openaction_js_scores_only_with_a_confirmed_trigger_path(active_trigger, expected):
+    assert heuristic_for_flag("HIGH", "OPENACTION_JS", active_trigger) == expected
 
 
 def test_extract_iocs_basic():
@@ -90,3 +99,45 @@ def test_parse_report_rejects_output_without_json():
 )
 def test_has_active_trigger(triggers, expected):
     assert has_active_trigger(triggers) is expected
+
+
+@pytest.mark.parametrize(
+    "literal,expected",
+    [
+        (r"(plain)", "plain"),
+        (r"(nested (parens) kept)", "nested (parens) kept"),
+        (r"(h\164tp://x)", "http://x"),            # octal escape hides "t"
+        (r"(a\)b\\c\nd)", "a)b\\c\nd"),
+        ("(split \\\nline)", "split line"),         # backslash-newline continues the string
+        ("(\xfe\xff\x00h\x00i)", "hi"),            # UTF-16BE text string
+        (r"(unterminated", None),
+    ],
+)
+def test_read_literal_string(literal, expected):
+    assert read_literal_string(literal, 1) == expected
+
+
+def test_uri_action_targets_decodes_literal_and_hex_forms():
+    body = "<</S/URI/URI(h\\164tp://octal.example/a)>> <</URI <687474703a2f2f6865782e6578616d706c652f62>>>"
+    assert uri_action_targets(body) == ["http://octal.example/a", "http://hex.example/b"]
+
+
+def test_uri_action_targets_pads_odd_hex():
+    assert uri_action_targets("/URI <41424>") == ["AB@"]
+
+
+def test_find_hidden_urls_skips_visible_and_safelisted():
+    visible = {"http://visible.example/x"}
+    bodies = [("obj 3", "/URI (http://visible.example/x)"),
+              ("obj 5 (inside object stream 6)", "/URI (http://hidden.example/a)")]
+    streams = [("stream of obj 6", b"/URI (http://hidden.example/a)"),
+               ("stream of obj 8", b"xmlns:x='http://ns.adobe.com/xap/1.0/' (https://printed.example/doc) Tj")]
+    assert find_hidden_urls(bodies, streams, visible) == [
+        ("http://hidden.example/a", "obj 5 (inside object stream 6)"),  # the unpacked object wins over its container
+        ("https://printed.example/doc", "stream of obj 8"),
+    ]
+
+
+@pytest.mark.parametrize("host,expected", [("203.0.113.3", True), ("256.1.1.1", False), ("evil.example", False)])
+def test_is_ip(host, expected):
+    assert is_ip(host) is expected

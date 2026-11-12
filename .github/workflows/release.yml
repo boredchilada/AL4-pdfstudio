@@ -1,7 +1,7 @@
 name: release
 on:
   push:
-    tags: ["v4.7.*"]
+    tags: ["v4.7.*", "v4.8.*"]
 
 permissions:
   contents: read
@@ -23,7 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF#refs/tags/}"
-          [[ "$tag" =~ ^v4\.7\.[0-9]+\.(stable|dev)[0-9]+$ ]] || { echo "tag $tag must look like v4.7.0.stable1 or v4.7.0.dev1"; exit 1; }
+          [[ "$tag" =~ ^v4\.[78]\.[0-9]+\.(stable|dev)[0-9]+$ ]] || { echo "tag $tag must look like v4.8.0.stable1 or v4.8.0.dev1"; exit 1; }
           image=$(sed -nE 's|^ *image: (ghcr\.io/[^:]+):\$SERVICE_TAG$|\1|p' service_manifest.yml)
           test -n "$image" || { echo "manifest image must be ghcr.io/<path>:\$SERVICE_TAG"; exit 1; }
           echo "VERSION=${tag#v}" >> "$GITHUB_ENV"

@@ -20,16 +20,19 @@ disable_cache: false
 
 enabled: true
 is_external: false
-privileged: true
+privileged: false
 
 # Static service configuration (-> self.config)
 config:
-  # Internal subprocess timeout; keep below the service `timeout` above.
+  # Seconds before the pdfstudio subprocess is aborted; capped at the service `timeout` minus 10.
   internal_timeout: 110
-  # Maximum number of IOCs tagged per type.
+  # Maximum number of IOCs tagged per type (1-5000).
   max_iocs: 200
-  # Maximum number of embedded payloads carved + resubmitted per file.
+  # Maximum number of embedded payloads listed or extracted per file (1-500).
   max_extracted_payloads: 30
+  # Extra domains not tagged as IOCs; their subdomains are skipped too. Added to the built-in
+  # list of XMP and metadata namespaces.
+  safelist_domains: []
 
 # Per-submission tunables (-> request.get_param)
 submission_params:
@@ -37,6 +40,10 @@ submission_params:
     type: bool
     default: false
     value: false
+  - name: extract_payloads
+    type: bool
+    default: true
+    value: true
 
 heuristics:
   - heur_id: 1
@@ -49,21 +56,27 @@ heuristics:
       pdfstudio flagged a HIGH severity indicator, such as an embedded
       executable, a launch/command action, or auto-executing JavaScript.
     signature_score_map:
-      embedded_pe: 1000
-      embedded_elf: 1000
-      embedded_zip: 500
-      launch_cmd: 1000
-      launch_newline_pad: 1000
+      # HIGH codes not listed here (embedded_pe, embedded_elf, launch, launch_*) score 1000.
       openaction_js: 750
+      # Inline JavaScript in /AA. Form fields use it for number and date formatting; pages and
+      # documents fire it on open, close or print.
+      aa_javascript: 500
+      aa_javascript_field: 100
+      js_export_data_object: 750
+      filespec_ext_mismatch: 500
+      not_a_pdf: 100
       # Links need a click; a link to an executable or archive is suspicious, not malicious.
       uri_to_executable: 300
-
   - heur_id: 2
     name: Medium Severity PDF Indicator
     score: 500
     filetype: document/pdf
     description: pdfstudio flagged a MED severity structural indicator.
     signature_score_map:
+      # Incremental updates and password protection are common in benign documents;
+      # cross-revision weaponization is scored by heuristic 6.
+      multi_rev: 0
+      encrypted: 0
       # Link targets need a click and are common in technical documents.
       url_shortener: 100
       dynamic_dns: 100
@@ -71,7 +84,6 @@ heuristics:
       raw_ip_uri: 100
       canarytoken: 100
       base64_in_uri: 100
-
   - heur_id: 3
     name: Low Severity PDF Indicator
     score: 100
@@ -86,15 +98,14 @@ heuristics:
 
   - heur_id: 5
     name: Catalog Trigger Path
-    score: 500
+    score: 0
     filetype: document/pdf
     attack_id:
       - T1204
     description: >-
       pdfstudio's catalog-graph walk found a trigger path (e.g. /OpenAction
-      or /AA) reaching a JavaScript or Launch action. Links, form widgets and
-      open-at-page actions are listed but not scored.
-
+      or /AA) reaching a JavaScript or Launch action. Context section; the
+      action itself is scored under heuristic 1.
   - heur_id: 6
     name: Multi-Revision Weaponization
     score: 750

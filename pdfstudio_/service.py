@@ -31,15 +31,27 @@ from pdfstudio.parser import parse
 
 from pdfstudio_.analysis import (
     HEUR_SECTION_TITLE,
+    aa_javascript_signature,
     extract_iocs,
     find_hidden_urls,
     has_active_trigger,
     heuristic_for_flag,
     is_ip,
+    normalize_domains,
     parse_report,
     sniff_embedded,
     url_host,
 )
+from pdfstudio_.defaults import (
+    EXTRACT_PAYLOADS,
+    INTERNAL_TIMEOUT,
+    MAX_EXTRACTED_PAYLOADS,
+    MAX_IOCS,
+    SAFELIST_DOMAINS,
+    SHOW_OBJECT_TABLE,
+    TIMEOUT_HEADROOM,
+)
+from pdfstudio_.settings import config_fingerprint, config_int, config_list, param_bool
 
 # pdfstudio exposes its CLI as ``pdfstudio.cli:main``. Calling main() through ``python -c`` is
 # independent of $PATH; argparse reads the arguments appended after the bootstrap string.
@@ -51,19 +63,25 @@ IOC_TAGS = {"uri": "network.static.uri", "domain": "network.static.domain", "ip"
 class PdfStudio(ServiceBase):
     def start(self) -> None:
         config = self.config or {}
-        self.internal_timeout = int(config.get("internal_timeout", 110))
-        self.max_iocs = int(config.get("max_iocs", 200))
-        self.max_extracted_payloads = int(config.get("max_extracted_payloads", 30))
+        ceiling = max(1, self.service_attributes.timeout - TIMEOUT_HEADROOM)
+        self.internal_timeout = config_int(config, "internal_timeout", min(INTERNAL_TIMEOUT, ceiling), 1, ceiling,
+                                           self.log)
+        self.max_iocs = config_int(config, "max_iocs", MAX_IOCS, 1, 5000, self.log)
+        self.max_extracted_payloads = config_int(config, "max_extracted_payloads", MAX_EXTRACTED_PAYLOADS, 1, 500,
+                                                 self.log)
+        self.safelist_domains = normalize_domains(config_list(config, "safelist_domains", SAFELIST_DOMAINS, self.log))
         self.log.info(f"PdfStudio started with {self.get_tool_version()}")
 
     def get_tool_version(self) -> str:
-        # A changed tool version makes AL re-run cached files, so include the exact build commit.
+        # A changed tool version makes AL re-run cached files, so include the exact build commit and
+        # a fingerprint of the service config (which is not part of AL's cache key).
+        fingerprint = config_fingerprint(self.config)
         try:
             version = metadata.version("pdfstudio")
         except metadata.PackageNotFoundError:
-            return "pdfstudio unknown"
+            return f"pdfstudio unknown-{fingerprint}"
         commit = os.environ.get("PDFSTUDIO_COMMIT", "")[:7]
-        return f"pdfstudio {version}+{commit}" if commit else f"pdfstudio {version}"
+        return f"pdfstudio {version}+{commit}-{fingerprint}" if commit else f"pdfstudio {version}-{fingerprint}"
 
     def execute(self, request: ServiceRequest) -> None:
         result = Result()
@@ -98,17 +116,17 @@ class PdfStudio(ServiceBase):
             json.dump(report, handle, indent=2)
         request.add_supplementary(report_path, "pdfstudio_report.json", "Full pdfstudio JSON report")
 
+        pdf = self._parse_in_process(request.file_path)
         self._add_summary(result, report)
-        self._add_flags(result, report.get("flags") or [], has_active_trigger(report.get("triggers") or []))
+        self._add_flags(result, report.get("flags") or [], has_active_trigger(report.get("triggers") or []), pdf)
         self._add_triggers(result, report.get("triggers") or [])
         self._add_revisions(result, report.get("revisions") or [])
         self._add_parse_warnings(result, report.get("parse_warnings") or [])
         visible = self._add_iocs(result, request)
-        pdf = self._parse_in_process(request.file_path)
         if pdf is not None:
             self._add_hidden_urls(result, pdf, visible)
-            self._extract_embedded(result, request, pdf)
-        if request.get_param("show_object_table") or request.deep_scan:
+            self._extract_embedded(result, request, pdf, param_bool(request, "extract_payloads", EXTRACT_PAYLOADS))
+        if param_bool(request, "show_object_table", SHOW_OBJECT_TABLE) or request.deep_scan:
             self._add_objects(result, report.get("objects") or [])
 
     @staticmethod
@@ -121,7 +139,11 @@ class PdfStudio(ServiceBase):
         result.add_section(summary)
 
     @staticmethod
-    def _add_flags(result: Result, flags: list[dict], active_trigger: bool) -> None:
+    def _add_flags(result: Result, flags: list[dict], active_trigger: bool, pdf: PDFFile | None) -> None:
+        bodies_by_index: dict[int, list[str]] = {}
+        if pdf is not None and any(flag.get("code") == "AA_JAVASCRIPT" for flag in flags):
+            for obj in pdf.objects:
+                bodies_by_index.setdefault(obj.index, []).append(obj.body)
         by_heuristic: dict[int, list[dict]] = {}
         for flag in flags:
             heur_id = heuristic_for_flag(flag.get("severity"), flag.get("code", ""), active_trigger)
@@ -135,9 +157,12 @@ class PdfStudio(ServiceBase):
                 section.add_row(TableRow({"code": code, "message": flag.get("message", "")}))
                 # Each rule scores once per file: a document with many links must not multiply its score.
                 # Signature ids must be lowercase for the AL ODM; the manifest's score map matches.
-                if code.lower() not in scored:
-                    scored.add(code.lower())
-                    heuristic.add_signature_id(code.lower())
+                signature = code.lower()
+                if code == "AA_JAVASCRIPT":
+                    signature = aa_javascript_signature(flag.get("message", ""), bodies_by_index)
+                if signature not in scored:
+                    scored.add(signature)
+                    heuristic.add_signature_id(signature)
             section.set_heuristic(heuristic)
             result.add_section(section)
 
@@ -179,7 +204,7 @@ class PdfStudio(ServiceBase):
     def _add_iocs(self, result: Result, request: ServiceRequest) -> set[str]:
         """Tag cleartext IOCs; returns the cleartext URLs so hidden ones can be told apart."""
         with open(request.file_path, "rb") as handle:
-            iocs = extract_iocs(handle.read())
+            iocs = extract_iocs(handle.read(), self.safelist_domains)
         section = ResultTableSection("Cleartext indicators of compromise")
         for kind, tag_type in IOC_TAGS.items():
             for value in iocs[kind][: self.max_iocs]:
@@ -215,7 +240,7 @@ class PdfStudio(ServiceBase):
                            obj.body))
             if obj.stream is not None and obj.stream.decoded_bytes:
                 streams.append((f"stream of obj {obj.index}", obj.stream.decoded_bytes))
-        hidden = find_hidden_urls(bodies, streams, visible)[: self.max_iocs]
+        hidden = find_hidden_urls(bodies, streams, visible, self.safelist_domains)[: self.max_iocs]
         if not hidden:
             return
         section = ResultTableSection("Hidden indicators (compressed or encoded)")
@@ -232,9 +257,9 @@ class PdfStudio(ServiceBase):
             section.add_tag(IOC_TAGS[kind], host)
         result.add_section(section)
 
-    def _extract_embedded(self, result: Result, request: ServiceRequest, pdf: PDFFile) -> None:
-        """Carve embedded payloads from decoded streams and resubmit them for analysis."""
-        section = ResultTableSection("Extracted embedded payloads")
+    def _extract_embedded(self, result: Result, request: ServiceRequest, pdf: PDFFile, extract: bool) -> None:
+        """Carve embedded payloads from decoded streams and, if ``extract``, resubmit them for analysis."""
+        section = ResultTableSection("Extracted embedded payloads" if extract else "Embedded payloads (not extracted)")
         seen: set[str] = set()
         for obj in pdf.objects:
             if len(seen) >= self.max_extracted_payloads:
@@ -257,15 +282,19 @@ class PdfStudio(ServiceBase):
 
             ext, description = sniffed
             name = f"obj_{obj.index}.{ext}"
-            path = os.path.join(self.working_directory, f"{sha256[:16]}_{name}")
-            with open(path, "wb") as handle:
-                handle.write(data)
-            try:
-                request.add_extracted(path, name, description, safelist_interface=self.api_interface)
-            except MaxExtractedExceeded:
-                self.log.info("Maximum extracted-file limit reached for this task")
-                break
-            section.add_row(TableRow({"file": name, "type": description, "size": len(data), "sha256": sha256}))
+            if extract:
+                path = os.path.join(self.working_directory, f"{sha256[:16]}_{name}")
+                with open(path, "wb") as handle:
+                    handle.write(data)
+                try:
+                    request.add_extracted(path, name, description, safelist_interface=self.api_interface)
+                except MaxExtractedExceeded:
+                    self.log.info("Maximum extracted-file limit reached for this task")
+                    break
+            row = {"file": name, "type": description, "size": len(data), "sha256": sha256}
+            if not extract:
+                row["offset"] = stream.raw_offset
+            section.add_row(TableRow(row))
         if section.body:
             result.add_section(section)
 

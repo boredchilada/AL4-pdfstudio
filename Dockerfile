@@ -32,7 +32,7 @@ WORKDIR /opt/al_service
 COPY --chown=assemblyline:assemblyline . .
 
 # Stamp the release version into the manifest (CCCS pattern). CI passes the git tag.
-ARG version=4.7.0.dev0
+ARG version=4.8.0.dev0
 USER root
 RUN sed -i -e "s/\$SERVICE_TAG/$version/g" service_manifest.yml && \
     chown -R assemblyline:assemblyline /opt/al_service

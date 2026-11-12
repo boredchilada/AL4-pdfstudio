@@ -1,8 +1,10 @@
 """Pure analysis helpers. No AssemblyLine imports, so they unit-test without the framework."""
 
+import ipaddress
 import json
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
+from urllib.parse import urlsplit
 
 # pdfstudio severity tier -> manifest heuristic id.
 SEVERITY_HEURISTIC = {"HIGH": 1, "MED": 2, "LOW": 3, "INFO": 4}
@@ -21,9 +23,23 @@ HEUR_SECTION_TITLE = {
 
 # --- IOC extraction (network-free, best effort over raw PDF bytes) -------------------
 
-_URI_RE = re.compile(rb"(?:https?|ftp)://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]{4,512}")
-_IP_RE = re.compile(rb"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b")
-_DOMAIN_FROM_URI_RE = re.compile(r"^[a-z]+://([^/:?#]+)", re.IGNORECASE)
+_URI_RE = re.compile(rb"(?:https?|ftp)://[A-Za-z0-9._~:/?#\[\]@!$&()*+,;=%-]{4,512}")
+# A dotted quad that is not part of a longer token: no letter, digit or underscore around it, and no
+# further dotted or hyphenated segment ("1.2.3.4.5", "1.2.3.4-beta", "lib-1.2.3.4"). A trailing sentence
+# dot or a leading minus sign does not hide it. Octets run 0-255 without leading zeros. Addresses in
+# 10/8, 127/8, 0/8 and 255/8 are not indicators and are skipped, as is "N.0.0.0": a network address
+# that headless Chrome writes into the Producer string as its version ("HeadlessChrome/150.0.0.0").
+_OCTET = rb"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"
+_IP_RE = re.compile(
+    rb"(?<![A-Za-z0-9_])(?<![A-Za-z0-9_][.-])(?!(?:10|127)\.\d+\b)(?!0\.)(?!255\.)(?!\d+\.0\.0\.0\b)"
+    rb"(?:" + _OCTET + rb"\.){3}" + _OCTET + rb"(?![A-Za-z0-9_]|[.-][A-Za-z0-9])"
+)
+# Words that introduce a version number ("Adobe PDF Library 15.0.0.1", "Version 1.2.3.4", "v1.2.3.4").
+# The leading \b keeps "server", "dev" and "srv" from matching "ver" or "v".
+_VERSION_PREFIX_RE = re.compile(
+    rb"\b(?:Library|Version|ver|build|release|InDesign|Acrobat|Distiller|PDF|v)[\s:=]*$",
+    re.IGNORECASE,
+)
 
 # Domains that appear in nearly every PDF (XMP/metadata namespaces, schemas). Tagging
 # these as IOCs would only create noise, so they are dropped before tagging.
@@ -31,7 +47,22 @@ IOC_DOMAIN_SAFELIST = {
     "www.w3.org", "w3.org", "ns.adobe.com", "www.adobe.com", "adobe.com",
     "purl.org", "iptc.org", "schemas.microsoft.com", "www.aiim.org",
     "poppler.freedesktop.org", "www.color.org", "creativecommons.org",
+    "ns.useplus.org", "prismstandard.org", "www.npes.org",
 }
+
+
+def normalize_domains(domains: Iterable[str]) -> frozenset[str]:
+    """Lower-cased bare domains: surrounding dots and a leading ``*.`` are dropped."""
+    cleaned = (d.strip().lower().removeprefix("*.").strip(".") for d in domains)
+    return frozenset(d for d in cleaned if d)
+
+
+def is_safelisted(host: str, extra_domains: frozenset[str] = frozenset()) -> bool:
+    """Built-in safelist entries match exactly; configured domains also match their subdomains."""
+    if host in IOC_DOMAIN_SAFELIST or host in extra_domains:
+        return True
+    return any(host.endswith("." + domain) for domain in extra_domains)
+
 
 # --- Embedded-payload carving --------------------------------------------------------
 
@@ -64,13 +95,82 @@ def heuristic_for_flag(severity: str | None, code: str, active_trigger: bool) ->
 
     ``OPENACTION_JS`` only means /OpenAction and /JavaScript both occur somewhere in the file. It is
     scored only when the trigger walk confirms an automatic path into JavaScript or Launch
-    (``active_trigger``); otherwise it is informational.
+    (``active_trigger``); otherwise it is informational. ``AA_JAVASCRIPT`` is not gated: pdfstudio
+    raises it for inline JavaScript in an /AA dictionary, which the trigger walk never reports
+    together with a HIGH trigger (it only follows indirect /AA actions of pages).
     """
     if code in CODE_HEURISTIC:
         return CODE_HEURISTIC[code]
     if code == "OPENACTION_JS" and not active_trigger:
         return 4
     return SEVERITY_HEURISTIC.get((severity or "").upper(), 4)
+
+
+# /AA events of form fields that compute, format, validate or filter a field value (K keystroke,
+# F format, V validate, C calculate). Every AcroForm number or date field uses them.
+_FIELD_VALUE_EVENTS = frozenset({"K", "F", "V", "C"})
+_AA_OPEN = re.compile(r"/AA\s*<<")
+_PDF_NAME = re.compile(r"/([^\s/<>\[\]()]+)")
+_FORM_FIELD = re.compile(r"/FT\s*/|/Subtype\s*/Widget\b")
+_FLAG_OBJECT = re.compile(r"\bobj (\d+)\b")
+
+
+def _skip_string(text: str, start: int) -> int:
+    """Index just after the literal string that opens at ``text[start] == '('``."""
+    depth = 0
+    i = start
+    while i < len(text):
+        char = text[i]
+        if char == "\\":
+            i += 2
+            continue
+        depth += char == "("
+        depth -= char == ")"
+        i += 1
+        if depth == 0:
+            break
+    return i
+
+
+def aa_events(body: str) -> set[str]:
+    """Names of the events (``O``, ``K``, ``Fo`` ...) of every inline /AA dictionary in an object body."""
+    events: set[str] = set()
+    for opening in _AA_OPEN.finditer(body):
+        depth = 1
+        i = opening.end()
+        while i < len(body) and depth:
+            char = body[i]
+            if char == "(":
+                i = _skip_string(body, i)
+            elif body.startswith("<<", i):
+                depth += 1
+                i += 2
+            elif body.startswith(">>", i):
+                depth -= 1
+                i += 2
+            elif char == "/":
+                name = _PDF_NAME.match(body, i)
+                if name and depth == 1:
+                    events.add(name.group(1))
+                i = name.end() if name else i + 1
+            else:
+                i += 1
+    return events
+
+
+def aa_javascript_signature(flag_message: str, bodies_by_index: Mapping[int, Sequence[str]]) -> str:
+    """Score signature of an ``AA_JAVASCRIPT`` flag: ``aa_javascript_field`` or ``aa_javascript``.
+
+    Form fields carry JavaScript in /AA for number, date and validation scripts (``AFNumber_Keystroke``),
+    so a field object whose /AA only uses value events (K, F, V, C) is the ordinary case. Every other
+    holder (page, document, annotation, or a field event such as mouse-over or focus) fires on user
+    or document activity and keeps the full signature. An object that cannot be found keeps it too.
+    """
+    found = _FLAG_OBJECT.search(flag_message)
+    bodies = bodies_by_index.get(int(found.group(1)), ()) if found else ()
+    if bodies and all(_FORM_FIELD.search(b) and aa_events(b) <= _FIELD_VALUE_EVENTS for b in bodies):
+        return "aa_javascript_field"
+    return "aa_javascript"
 
 
 def has_active_trigger(triggers: list[dict]) -> bool:
@@ -83,13 +183,13 @@ def has_active_trigger(triggers: list[dict]) -> bool:
     return any((t.get("severity") or "").upper() == "HIGH" for t in triggers)
 
 
-def urls_in(data: bytes) -> list[str]:
-    """Every http/https/ftp URL in ``data``, in order of appearance, namespace domains removed."""
+def urls_in(data: bytes, extra_domains: frozenset[str] = frozenset()) -> list[str]:
+    """Every http/https/ftp URL in ``data``, in order of appearance, safelisted domains removed."""
     urls = []
     for match in _URI_RE.findall(data):
-        uri = match.decode("latin-1").rstrip(").>")
-        dm = _DOMAIN_FROM_URI_RE.match(uri)
-        if dm and dm.group(1).lower() in IOC_DOMAIN_SAFELIST:
+        uri = match.decode("latin-1").rstrip(".,;)>'\"")
+        host = url_host(uri)
+        if not host or is_safelisted(host, extra_domains):
             continue
         urls.append(uri)
     return urls
@@ -97,24 +197,47 @@ def urls_in(data: bytes) -> list[str]:
 
 def url_host(uri: str) -> str | None:
     """Lower-cased host part of a URL, or None."""
-    dm = _DOMAIN_FROM_URI_RE.match(uri)
-    return dm.group(1).lower() if dm else None
+    try:
+        host = urlsplit(uri).hostname
+    except ValueError:
+        return None
+    if not host:
+        return None
+    host = host.lower()
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_loopback or ip.is_link_local or ip.is_unspecified:
+            return None
+        return host
+    except ValueError:
+        return host if "." in host or host.isalpha() else None
 
 
 def is_ip(host: str) -> bool:
-    return _IP_RE.fullmatch(host.encode("latin-1", "replace")) is not None
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
 
 
-def extract_iocs(raw: bytes) -> dict[str, list[str]]:
-    """Cleartext IOCs found in raw PDF bytes, with namespace domains removed.
+def extract_iocs(raw: bytes, extra_domains: frozenset[str] = frozenset()) -> dict[str, list[str]]:
+    """Cleartext IOCs found in raw PDF bytes, with safelisted domains removed.
 
     Only cleartext is matched here; :func:`find_hidden_urls` covers compressed and encoded URLs.
     """
-    uris = set(urls_in(raw))
-    domains = {host for host in map(url_host, uris) if host}
-    ips = {match.decode("latin-1") for match in _IP_RE.findall(raw)}
+    uris = set(urls_in(raw, extra_domains))
+    hosts = {host for host in map(url_host, uris) if host}
+    domains = {host for host in hosts if not is_ip(host)}
+    ips = {host for host in hosts if is_ip(host)}
+    for m in _IP_RE.finditer(raw):
+        prefix = raw[max(0, m.start() - 24):m.start()]
+        if _VERSION_PREFIX_RE.search(prefix):
+            continue
+        candidate = m.group(0).decode("latin-1")
+        if is_ip(candidate):
+            ips.add(candidate)
     return {"uri": sorted(uris), "domain": sorted(domains), "ip": sorted(ips)}
-
 
 # --- PDF strings and hidden URLs -------------------------------------------------------
 
@@ -188,7 +311,7 @@ def uri_action_targets(body: str) -> list[str]:
 
 
 def find_hidden_urls(bodies: Iterable[tuple[str, str]], streams: Iterable[tuple[str, bytes]],
-                     visible: set[str]) -> list[tuple[str, str]]:
+                     visible: set[str], extra_domains: frozenset[str] = frozenset()) -> list[tuple[str, str]]:
     """URLs that do not appear as plain text in the file, as ``(url, where)`` sorted by URL.
 
     ``bodies`` are object dictionaries, including objects unpacked from object streams; their
@@ -204,10 +327,10 @@ def find_hidden_urls(bodies: Iterable[tuple[str, str]], streams: Iterable[tuple[
 
     for where, body in bodies:
         targets = uri_action_targets(body)
-        add([u for t in targets for u in urls_in(t.encode("latin-1", "replace"))], where)
-        add(urls_in(body.encode("latin-1", "replace")), where)
+        add([u for t in targets for u in urls_in(t.encode("latin-1", "replace"), extra_domains)], where)
+        add(urls_in(body.encode("latin-1", "replace"), extra_domains), where)
     for where, data in streams:
-        add(urls_in(data), where)
+        add(urls_in(data, extra_domains), where)
     return sorted(found.items())
 
 

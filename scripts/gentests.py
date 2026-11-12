@@ -6,9 +6,11 @@ it writes before committing it.
 """
 
 import os
+import sys
 from pathlib import Path
 
 ROOT = Path.cwd()
+sys.path.insert(0, str(ROOT))
 os.environ["SERVICE_MANIFEST_PATH"] = str(ROOT / "service_manifest.yml")
 
 from assemblyline.common.importing import load_module_by_path  # noqa: E402

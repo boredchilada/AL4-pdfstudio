@@ -1,0 +1,159 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 100,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": {
+          "flags": 3,
+          "header": "%PDF-1.4",
+          "objects": 4,
+          "parse_warnings": 0,
+          "revisions": 1,
+          "size_bytes": 648,
+          "triggers": 1
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "pdfstudio summary",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "AA_JAVASCRIPT",
+            "message": "obj 4 has an /AA (Additional Actions) dictionary invoking JavaScript \u2014 fires on a triggering event without needing /OpenAction."
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1204"
+          ],
+          "frequency": 1,
+          "heur_id": 1,
+          "score": 100,
+          "score_map": {},
+          "signatures": {
+            "aa_javascript_field": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "High severity indicators",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "HAS_ACROFORM",
+            "message": "PDF declares /AcroForm \u2014 interactive form present (1 Widget field)."
+          },
+          {
+            "code": "HAS_AA",
+            "message": "/AA (Additional Actions) present \u2014 triggers on page/widget events (open, close, focus, mouse). Walk the linked action(s)."
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 4,
+          "score": 0,
+          "score_map": {},
+          "signatures": {
+            "has_aa": 1,
+            "has_acroform": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Informational observations",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "detail": "<< /Type /Annot /Subtype /Widget /FT /Tx /T (amount) /Rect [10 10 100 30] /AA << /K << /S /JavaScript /JS (AFNumber_Keystroke\\(2, 0, 0, 0, \\\"\\\", true\\);) >> /F ",
+            "path": "Page \u2192 obj 4 [Annot:Widget]",
+            "severity": "LOW",
+            "trigger": "/Annot"
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "trigger",
+            "path",
+            "detail",
+            "severity"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Catalog trigger paths",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "pdfstudio_report.json",
+        "sha256": "2dada6c98d42cc346fea1bb6862222ead619fc14c586f64a8404996d5fa0f2af"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [
+          "T1204"
+        ],
+        "heur_id": 1,
+        "signatures": [
+          "aa_javascript_field"
+        ]
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 4,
+        "signatures": [
+          "has_acroform",
+          "has_aa"
+        ]
+      }
+    ],
+    "tags": {},
+    "temp_submission_data": {}
+  }
+}

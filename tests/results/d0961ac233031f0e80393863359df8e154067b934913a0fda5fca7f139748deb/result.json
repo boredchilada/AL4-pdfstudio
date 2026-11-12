@@ -1,0 +1,126 @@
+{
+  "extra": {
+    "drop_file": false,
+    "score": 500,
+    "sections": [
+      {
+        "auto_collapse": false,
+        "body": {
+          "flags": 2,
+          "header": "%PDF-1.4",
+          "objects": 3,
+          "parse_warnings": 0,
+          "revisions": 1,
+          "size_bytes": 385,
+          "triggers": 0
+        },
+        "body_config": {},
+        "body_format": "KEY_VALUE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": null,
+        "promote_to": null,
+        "tags": {},
+        "title_text": "pdfstudio summary",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "AA_JAVASCRIPT",
+            "message": "obj 3 has an /AA (Additional Actions) dictionary invoking JavaScript \u2014 fires on a triggering event without needing /OpenAction."
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [
+            "T1204"
+          ],
+          "frequency": 1,
+          "heur_id": 1,
+          "score": 500,
+          "score_map": {},
+          "signatures": {
+            "aa_javascript": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "High severity indicators",
+        "zeroize_on_tag_safe": false
+      },
+      {
+        "auto_collapse": false,
+        "body": [
+          {
+            "code": "HAS_AA",
+            "message": "/AA (Additional Actions) present \u2014 triggers on page/widget events (open, close, focus, mouse). Walk the linked action(s)."
+          }
+        ],
+        "body_config": {
+          "column_order": [
+            "code",
+            "message"
+          ]
+        },
+        "body_format": "TABLE",
+        "classification": "TLP:C",
+        "depth": 0,
+        "heuristic": {
+          "attack_ids": [],
+          "frequency": 1,
+          "heur_id": 4,
+          "score": 0,
+          "score_map": {},
+          "signatures": {
+            "has_aa": 1
+          }
+        },
+        "promote_to": null,
+        "tags": {},
+        "title_text": "Informational observations",
+        "zeroize_on_tag_safe": false
+      }
+    ]
+  },
+  "files": {
+    "extracted": [],
+    "supplementary": [
+      {
+        "name": "pdfstudio_report.json",
+        "sha256": "db41d2319554f096b1bd86eb6de31e0c30baefb940290087a0f6d8f692b98c76"
+      }
+    ]
+  },
+  "results": {
+    "heuristics": [
+      {
+        "attack_ids": [
+          "T1204"
+        ],
+        "heur_id": 1,
+        "signatures": [
+          "aa_javascript"
+        ]
+      },
+      {
+        "attack_ids": [],
+        "heur_id": 4,
+        "signatures": [
+          "has_aa"
+        ]
+      }
+    ],
+    "tags": {},
+    "temp_submission_data": {}
+  }
+}
